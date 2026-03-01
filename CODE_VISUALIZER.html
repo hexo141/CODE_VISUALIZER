@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Visualizer</title>
+    <!-- 引入 PrismJS 用于语法高亮 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-tsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
+    
+    <!-- 引入字体 -->
+    <link href="https://fontsource.ks3-cn-beijing.ksyun.com/jetbrains-mono/400.css" rel="stylesheet">
+    <link href="https://fontsource.ks3-cn-beijing.ksyun.com/jetbrains-mono/700.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0d0d12;
+            --text-color: #a9b7c6;
+            --accent-color: #61afef;
+            --cursor-color: #61afef;
+            --line-height: 1.6;
+            --font-size: 18px;
+            --camera-lag: 0.08;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* 背景网格线效果 */
+        .grid-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* 初始上传界面 */
+        #upload-screen {
+            position: absolute;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            transition: opacity 0.5s ease;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .btn {
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
+            background: transparent;
+            padding: 12px 30px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: var(--text-color);
+            color: var(--bg-color);
+            box-shadow: 0 0 15px rgba(169, 183, 198, 0.4);
+        }
+
+        input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* 代码显示区域容器 (Camera Viewport) */
+        #viewport {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden; /* 关键：隐藏超出部分，模拟相机视野 */
+            z-index: 10;
+        }
+
+        /* 实际移动的代码层 */
+        #code-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform;
+            /* 初始位置由 JS 控制 */
+            transform: translate(0, 0); 
+            padding: 50vh 50vw; /* 增加内边距，防止代码贴边 */
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        pre {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            font-size: var(--font-size);
+            line-height: var(--line-height);
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
+            display: inline-block; /* 让 pre 宽度适应内容 */
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace !important;
+            white-space: pre;
+            display: block;
+        }
+
+        /* 光标样式 */
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 1.2em;
+            background-color: var(--cursor-color);
+            vertical-align: text-bottom;
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+            box-shadow: 0 0 10px var(--cursor-color);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 语法高亮微调 (覆盖 Prism 默认) */
+        .token.comment, .token.prolog, .token.doctype, .token.cdata {
+            color: #5c6370;
+            font-style: italic;
+        }
+        .token.punctuation {
+            color: #abb2bf;
+        }
+        .token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted {
+            color: #d19a66;
+        }
+        .token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted {
+            color: #98c379;
+        }
+        .token.operator, .token.entity, .token.url, .language-css .token.string, .style .token.string {
+            color: #56b6c2;
+        }
+        .token.atrule, .token.attr-value, .token.keyword {
+            color: #c678dd;
+        }
+        .token.function, .token.class-name {
+            color: #61afef;
+        }
+        .token.regex, .token.important, .token.variable {
+            color: #e06c75;
+        }
+
+        /* 晕影效果 */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 0 150px rgba(0,0,0,0.9) inset;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 12px;
+            opacity: 0.5;
+            font-family: 'JetBrains Mono', monospace;
+            z-index: 30;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="grid-bg"></div>
+    <div class="vignette"></div>
+
+    <!-- 上传界面 -->
+    <div id="upload-screen">
+        <h2 style="font-weight: 400; letter-spacing: 4px; margin-bottom: 10px;">CODE_VISUALIZER</h2>
+        <div class="file-input-wrapper">
+            <button class="btn">选择代码文件</button>
+            <input type="file" id="file-input" accept=".py,.js,.ts,.jsx,.tsx,.css,.html,.java,.c,.cpp,.h,.json,.md,.txt">
+        </div>
+        <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">支持 Python, JS, C++, Java 等</p>
+    </div>
+
+    <!-- 代码视口 -->
+    <div id="viewport">
+        <div id="code-layer">
+            <pre><code id="code-content"></code></pre>
+        </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">READY</div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const uploadScreen = document.getElementById('upload-screen');
+        const codeContent = document.getElementById('code-content');
+        const codeLayer = document.getElementById('code-layer');
+        const statusBar = document.getElementById('status-bar');
+        const viewport = document.getElementById('viewport');
+
+        let fullCode = "";
+        let currentIndex = 0;
+        let isTyping = false;
+        let currentLanguage = 'plaintext';
+        
+        // 相机状态
+        let camera = { x: 0, y: 0 };
+        let targetCamera = { x: 0, y: 0 };
+        
+        // 配置
+        const TYPING_SPEED_BASE = 30; // 基础打字速度 ms
+        const TYPING_SPEED_VAR = 40;  // 随机波动
+        const THINKING_CHANCE = 0.05; // 思考概率
+        const THINKING_DURATION = 400; // 思考时长 ms
+        const CAMERA_SENSITIVITY = 0.12; // 相机跟随灵敏度 (0-1) 降低一点让延迟感更明显
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            currentLanguage = getLanguageFromExtension(file.name);
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                fullCode = event.target.result;
+                startVisualization();
+            };
+            reader.readAsText(file);
+        });
+
+        function startVisualization() {
+            uploadScreen.style.opacity = '0';
+            setTimeout(() => {
+                uploadScreen.style.display = 'none';
+                statusBar.innerText = "CODING...";
+                
+                // 初始化：先渲染第一个字符，确保相机有目标
+                if (fullCode.length > 0) {
+                    const initialChar = fullCode.substring(0, 1);
+                    const highlightedCode = Prism.highlight(initialChar, Prism.languages[currentLanguage] || Prism.languages.plaintext, currentLanguage);
+                    codeContent.innerHTML = highlightedCode + '<span class="cursor"></span>';
+                    
+                    // 强制重绘以获取位置
+                    codeContent.getBoundingClientRect();
+                    
+                    updateCursorTarget();
+                    // 立即设置相机位置，避免初始闪烁
+                    camera.x = targetCamera.x;
+                    camera.y = targetCamera.y;
+                    codeLayer.style.transform = `translate(${camera.x}px, ${camera.y}px)`;
+                    
+                    currentIndex = 1;
+                    typeNextChar();
+                    requestAnimationFrame(updateCamera);
+                }
+            }, 500);
+        }
+
+        async function typeNextChar() {
+            if (currentIndex >= fullCode.length) {
+                statusBar.innerText = "COMPLETED (Github: hexo141)";
+                isTyping = false;
+                return;
+            }
+
+            isTyping = true;
+            
+            // 1. 获取下一个字符
+            const char = fullCode[currentIndex];
+            currentIndex++;
+
+            // 2. 构建当前完整字符串
+            const currentText = fullCode.substring(0, currentIndex);
+
+            // 3. 使用 Prism 高亮当前文本
+            const highlightedCode = Prism.highlight(currentText, Prism.languages[currentLanguage] || Prism.languages.plaintext, currentLanguage);
+
+            // 4. 更新 DOM
+            codeContent.innerHTML = highlightedCode + '<span class="cursor"></span>';
+
+            // 5. 计算光标位置用于相机移动
+            updateCursorTarget();
+
+            // 6. 决定下一次打字的时间 (模拟思考)
+            let delay = TYPING_SPEED_BASE + Math.random() * TYPING_SPEED_VAR;
+
+            // 遇到特定字符（如换行、分号、大括号）增加停顿概率
+            if (['\n', '{', '}', ';', ':'].includes(char)) {
+                if (Math.random() < 0.3) delay += 150;
+            }
+
+            // 随机深度思考
+            if (Math.random() < THINKING_CHANCE) {
+                delay += THINKING_DURATION;
+                statusBar.innerText = "THINKING...";
+            } else {
+                statusBar.innerText = "CODING...";
+            }
+
+            setTimeout(typeNextChar, delay);
+        }
+
+        function getLanguageFromExtension(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const map = {
+                'py': 'python',
+                'js': 'javascript',
+                'ts': 'typescript',
+                'jsx': 'jsx',
+                'tsx': 'tsx',
+                'css': 'css',
+                'html': 'html',
+                'java': 'java',
+                'c': 'c',
+                'cpp': 'cpp',
+                'h': 'c',
+                'json': 'json',
+                'md': 'markdown'
+            };
+            return map[ext] || 'plaintext';
+        }
+
+        function updateCursorTarget() {
+            // 获取光标元素
+            const cursorEl = document.querySelector('.cursor');
+            if (!cursorEl) return;
+
+            // 获取视口尺寸
+            const viewportWidth = viewport.clientWidth;
+            const viewportHeight = viewport.clientHeight;
+
+            // 获取光标相对于 code-layer 的位置
+            // code-layer 是 absolute, top:0, left:0
+            // cursor 在 code-layer 内部
+            const cursorRect = cursorEl.getBoundingClientRect();
+            const layerRect = codeLayer.getBoundingClientRect();
+
+            // 光标在 code-layer 坐标系中的位置
+            const relativeX = cursorRect.left - layerRect.left;
+            const relativeY = cursorRect.top - layerRect.top;
+
+            // 目标：让光标保持在视口中心
+            // 相机位置 = 视口中心 - 光标相对位置
+            // 这样 transform(相机位置) + 光标相对位置 = 视口中心
+            targetCamera.x = (viewportWidth / 2) - relativeX;
+            targetCamera.y = (viewportHeight / 2) - relativeY;
+        }
+
+        function updateCamera() {
+            // 线性插值 (Lerp) 实现延迟跟随
+            camera.x += (targetCamera.x - camera.x) * CAMERA_SENSITIVITY;
+            camera.y += (targetCamera.y - camera.y) * CAMERA_SENSITIVITY;
+
+            // 应用变换
+            codeLayer.style.transform = `translate(${camera.x}px, ${camera.y}px)`;
+
+            requestAnimationFrame(updateCamera);
+        }
+
+        // 窗口大小改变时重新计算目标，确保代码不飞出视野
+        window.addEventListener('resize', () => {
+            if (currentIndex > 0 || fullCode.length === 0) {
+                updateCursorTarget();
+            }
+        });
+
+    </script>
+</body>
+</html>
+
