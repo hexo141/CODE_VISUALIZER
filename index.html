@@ -4,85 +4,94 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Visualizer</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Code Visualizer</h1>
+        <!-- 头部 -->
+        <header class="header">
+            <h1 class="title">Code Visualizer</h1>
             <p class="subtitle">CODE_VISUALIZER</p>
         </header>
 
-        <div class="controls-panel">
-            <div class="control-group">
-                <label for="fileInput">选择代码文件</label>
-                <input type="file" id="fileInput" accept=".py,.js,.cpp,.java,.txt">
-            </div>
-
-            <div class="control-group">
-                <label>支持语言</label>
-                <span class="supported-langs">Python, JS, C++, Java 等</span>
-            </div>
-
-            <div class="settings-panel">
-                <h3>⚙️ 高级设置</h3>
-                
-                <div class="setting-item">
-                    <label for="typingSpeed">打字速度 (ms/字符)</label>
-                    <input type="range" id="typingSpeed" min="10" max="500" value="50">
-                    <span id="typingSpeedValue">50</span>
-                </div>
-
-                <div class="setting-item">
-                    <label for="thinkTime">思考时间 (ms)</label>
-                    <input type="range" id="thinkTime" min="0" max="2000" value="500">
-                    <span id="thinkTimeValue">500</span>
-                </div>
-
-                <div class="setting-item">
-                    <label for="cameraShake">相机摇晃</label>
-                    <select id="cameraShake">
-                        <option value="none">关闭</option>
-                        <option value="light">轻微</option>
-                        <option value="medium">中等</option>
-                        <option value="heavy">强烈</option>
-                    </select>
-                </div>
-
-                <div class="setting-item">
-                    <label for="showLineNumbers">显示行号</label>
-                    <input type="checkbox" id="showLineNumbers" checked>
-                </div>
-
-                <div class="setting-item">
-                    <label for="highlightSyntax">语法高亮</label>
-                    <input type="checkbox" id="highlightSyntax" checked>
-                </div>
-            </div>
-
-            <div class="status-bar">
-                <span id="status">READY</span>
-                <span id="progressInfo"></span>
-            </div>
-
-            <button id="startBtn" class="btn-primary">开始可视化</button>
-            <button id="resetBtn" class="btn-secondary">重置</button>
+        <!-- 文件选择区 -->
+        <div class="file-section">
+            <label class="file-label">
+                <input type="file" id="codeFile" accept=".py,.js,.cpp,.java,.txt" hidden>
+                <span class="file-btn">📁 选择代码文件</span>
+            </label>
+            <p class="file-hint">支持 Python, JS, C++, Java 等</p>
         </div>
 
-        <div class="code-display">
-            <div class="code-header">
-                <div class="window-controls">
-                    <span class="control-dot red"></span>
-                    <span class="control-dot yellow"></span>
-                    <span class="control-dot green"></span>
-                </div>
-                <span class="filename" id="filename">未选择文件</span>
-                <span class="line-count" id="lineCount">0 行</span>
+        <!-- 设置面板 -->
+        <div class="settings-panel">
+            <h3 class="settings-title">⚙️ 自定义设置</h3>
+            
+            <div class="setting-group">
+                <label>
+                    <span>🚀 播放速度</span>
+                    <input type="range" id="speed" min="1" max="100" value="50">
+                    <span class="value-display" id="speedValue">50</span>
+                </label>
             </div>
-            <pre><code id="codeContent"></code></pre>
+
+            <div class="setting-group">
+                <label>
+                    <span>🤔 思考时间 (ms)</span>
+                    <input type="range" id="thinkTime" min="0" max="2000" value="500">
+                    <span class="value-display" id="thinkTimeValue">500</span>
+                </label>
+            </div>
+
+            <div class="setting-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="showLineNumbers" checked>
+                    <span>📏 显示代码行数</span>
+                </label>
+            </div>
+
+            <div class="setting-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="cameraShake" checked>
+                    <span>📷 相机摇晃效果</span>
+                </label>
+            </div>
+
+            <div class="setting-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="autoPlay" checked>
+                    <span>▶️ 自动播放</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="controls">
+            <button id="playBtn" class="control-btn">▶️ 播放</button>
+            <button id="pauseBtn" class="control-btn">⏸️ 暂停</button>
+            <button id="resetBtn" class="control-btn">🔄 重置</button>
+        </div>
+
+        <!-- 状态显示 -->
+        <div class="status-bar">
+            <span id="status">READY</span>
+            <span class="line-counter" id="lineCounter">0 行</span>
+        </div>
+
+        <!-- 代码显示区 -->
+        <div class="code-container" id="codeContainer">
+            <div class="code-content" id="codeContent">
+                <pre><code id="codeDisplay">// 等待加载代码...</code></pre>
+            </div>
+            <div class="line-numbers" id="lineNumbers"></div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
 </body>
 </html>
