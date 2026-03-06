@@ -1,278 +1,244 @@
-// ===== 代码可视化器 - 主脚本 =====
-
 class CodeVisualizer {
     constructor() {
-        // DOM 元素
-        this.codeFileInput = document.getElementById('codeFile');
-        this.codeDisplay = document.getElementById('codeDisplay');
-        this.codeContainer = document.getElementById('codeContainer');
-        this.lineNumbers = document.getElementById('lineNumbers');
-        this.status = document.getElementById('status');
-        this.lineCounter = document.getElementById('lineCounter');
-        this.progressBar = document.getElementById('progressBar');
-        
-        // 设置元素
-        this.speedInput = document.getElementById('speed');
-        this.thinkTimeInput = document.getElementById('thinkTime');
-        this.showLineNumbersInput = document.getElementById('showLineNumbers');
-        this.cameraShakeInput = document.getElementById('cameraShake');
-        this.autoPlayInput = document.getElementById('autoPlay');
-        
-        // 值显示
-        this.speedValue = document.getElementById('speedValue');
-        this.thinkTimeValue = document.getElementById('thinkTimeValue');
-        
-        // 控制按钮
-        this.playBtn = document.getElementById('playBtn');
-        this.pauseBtn = document.getElementById('pauseBtn');
-        this.resetBtn = document.getElementById('resetBtn');
-        
-        // 状态
-        this.code = '';
-        this.lines = [];
-        this.currentLine = 0;
-        this.isPlaying = false;
+        this.codeContent = '';
+        this.displayedCode = '';
+        this.currentIndex = 0;
+        this.isRunning = false;
         this.isPaused = false;
+        this.typingSpeed = 30;
+        this.thinkTime = 500;
+        this.cameraShake = false;
+        this.showLineNumbers = true;
+        this.syntaxHighlight = true;
         this.timer = null;
         
-        // 初始化
-        this.init();
+        this.initElements();
+        this.initEventListeners();
+        this.updateSettings();
     }
-    
-    init() {
-        this.bindEvents();
-        this.updateSettingsDisplay();
-        this.setStatus('READY');
+
+    initElements() {
+        this.elements = {
+            codeFile: document.getElementById('codeFile'),
+            typingSpeed: document.getElementById('typingSpeed'),
+            thinkTime: document.getElementById('thinkTime'),
+            cameraShake: document.getElementById('cameraShake'),
+            showLineNumbers: document.getElementById('showLineNumbers'),
+            syntaxHighlight: document.getElementById('syntaxHighlight'),
+            speedValue: document.getElementById('speedValue'),
+            thinkValue: document.getElementById('thinkValue'),
+            fileInfo: document.getElementById('fileInfo'),
+            progressInfo: document.getElementById('progressInfo'),
+            editorContainer: document.getElementById('editorContainer'),
+            lineNumbers: document.getElementById('lineNumbers'),
+            codeDisplay: document.getElementById('codeDisplay'),
+            codeContent: document.getElementById('codeContent'),
+            startBtn: document.getElementById('startBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            resetBtn: document.getElementById('resetBtn')
+        };
     }
-    
-    bindEvents() {
-        // 文件选择
-        this.codeFileInput.addEventListener('change', (e) => this.loadFile(e));
+
+    initEventListeners() {
+        this.elements.codeFile.addEventListener('change', (e) => this.loadFile(e));
+        this.elements.typingSpeed.addEventListener('input', () => this.updateSettings());
+        this.elements.thinkTime.addEventListener('input', () => this.updateSettings());
+        this.elements.cameraShake.addEventListener('change', () => this.updateSettings());
+        this.elements.showLineNumbers.addEventListener('change', () => this.updateSettings());
+        this.elements.syntaxHighlight.addEventListener('change', () => this.updateSettings());
         
-        // 设置变化
-        this.speedInput.addEventListener('input', () => this.updateSettingsDisplay());
-        this.thinkTimeInput.addEventListener('input', () => this.updateSettingsDisplay());
-        this.showLineNumbersInput.addEventListener('change', () => this.toggleLineNumbers());
-        this.cameraShakeInput.addEventListener('change', () => this.toggleCameraShake());
-        
-        // 控制按钮
-        this.playBtn.addEventListener('click', () => this.play());
-        this.pauseBtn.addEventListener('click', () => this.pause());
-        this.resetBtn.addEventListener('click', () => this.reset());
-        
-        // 键盘快捷键
-        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+        this.elements.startBtn.addEventListener('click', () => this.start());
+        this.elements.pauseBtn.addEventListener('click', () => this.togglePause());
+        this.elements.resetBtn.addEventListener('click', () => this.reset());
     }
-    
-    updateSettingsDisplay() {
-        this.speedValue.textContent = this.speedInput.value;
-        this.thinkTimeValue.textContent = this.thinkTimeInput.value;
+
+    updateSettings() {
+        this.typingSpeed = parseInt(this.elements.typingSpeed.value);
+        this.thinkTime = parseInt(this.elements.thinkTime.value);
+        this.cameraShake = this.elements.cameraShake.checked;
+        this.showLineNumbers = this.elements.showLineNumbers.checked;
+        this.syntaxHighlight = this.elements.syntaxHighlight.checked;
+        
+        this.elements.speedValue.textContent = this.typingSpeed;
+        this.elements.thinkValue.textContent = this.thinkTime;
+        
+        this.elements.lineNumbers.classList.toggle('hidden', !this.showLineNumbers);
+        
+        if (this.displayedCode) {
+            this.updateDisplay();
+        }
     }
-    
+
     loadFile(event) {
         const file = event.target.files[0];
         if (!file) return;
         
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.code = e.target.result;
-            this.lines = this.code.split('\n');
-            this.renderCode();
-            this.setStatus('LOADED');
-            this.lineCounter.textContent = `${this.lines.length} 行`;
-            
-            if (this.autoPlayInput.checked) {
-                setTimeout(() => this.play(), 500);
-            }
+            this.codeContent = e.target.result;
+            this.elements.fileInfo.textContent = `📄 ${file.name} (${this.codeContent.length} 字符)`;
+            this.elements.progressInfo.textContent = 'READY';
+            this.reset();
         };
         reader.readAsText(file);
     }
-    
-    renderCode() {
-        // 渲染代码行
-        const html = this.lines.map((line, index) => 
-            `<span class="code-line" data-line="${index}">${this.escapeHtml(line) || ' '}</span>`
-        ).join('\n');
-        
-        this.codeDisplay.innerHTML = html;
-        
-        // 渲染行号
-        this.renderLineNumbers();
-    }
-    
-    renderLineNumbers() {
-        const html = this.lines.map((_, index) => 
-            `<span data-line="${index}">${index + 1}</span>`
-        ).join('\n');
-        
-        this.lineNumbers.innerHTML = html;
-        this.toggleLineNumbers();
-    }
-    
-    toggleLineNumbers() {
-        if (this.showLineNumbersInput.checked) {
-            this.lineNumbers.classList.remove('hidden');
-            this.codeDisplay.parentElement.style.paddingLeft = '60px';
-        } else {
-            this.lineNumbers.classList.add('hidden');
-            this.codeDisplay.parentElement.style.paddingLeft = '20px';
-        }
-    }
-    
-    toggleCameraShake() {
-        // 设置将在播放时生效
-    }
-    
-    play() {
-        if (this.lines.length === 0) {
-            this.setStatus('NO CODE');
+
+    start() {
+        if (!this.codeContent) {
+            alert('请先选择代码文件！');
             return;
         }
         
-        if (this.currentLine >= this.lines.length) {
-            this.reset();
-        }
+        if (this.isRunning && !this.isPaused) return;
         
-        this.isPlaying = true;
+        this.isRunning = true;
         this.isPaused = false;
-        this.setStatus('PLAYING');
-        this.status.classList.add('playing');
+        this.elements.startBtn.disabled = true;
+        this.elements.pauseBtn.disabled = false;
+        this.elements.progressInfo.textContent = '▶ 运行中...';
         
-        this.playNextLine();
+        this.typeNextChar();
     }
-    
-    playNextLine() {
-        if (!this.isPlaying || this.isPaused) return;
+
+    togglePause() {
+        if (!this.isRunning) return;
         
-        if (this.currentLine >= this.lines.length) {
+        this.isPaused = !this.isPaused;
+        
+        if (this.isPaused) {
+            clearTimeout(this.timer);
+            this.elements.progressInfo.textContent = '⏸ 已暂停';
+            this.elements.pauseBtn.textContent = '▶ 继续';
+        } else {
+            this.elements.progressInfo.textContent = '▶ 运行中...';
+            this.elements.pauseBtn.textContent = '⏸ 暂停';
+            this.typeNextChar();
+        }
+    }
+
+    reset() {
+        clearTimeout(this.timer);
+        this.isRunning = false;
+        this.isPaused = false;
+        this.currentIndex = 0;
+        this.displayedCode = '';
+        
+        this.elements.startBtn.disabled = false;
+        this.elements.pauseBtn.disabled = true;
+        this.elements.pauseBtn.textContent = '⏸ 暂停';
+        this.elements.progressInfo.textContent = 'READY';
+        
+        this.updateDisplay();
+    }
+
+    typeNextChar() {
+        if (this.currentIndex >= this.codeContent.length) {
             this.complete();
             return;
         }
         
-        // 高亮当前行
-        this.highlightLine(this.currentLine);
+        if (this.isPaused) return;
         
-        // 更新进度
-        this.updateProgress();
+        const char = this.codeContent[this.currentIndex];
+        this.displayedCode += char;
+        this.currentIndex++;
         
-        // 相机摇晃效果
-        if (this.cameraShakeInput.checked) {
-            this.triggerCameraShake();
-        }
+        this.updateDisplay();
+        this.triggerCameraShake();
         
-        // 计算下一行时间
-        const speed = 101 - this.speedInput.value; // 反转，值越大越快
-        const thinkTime = parseInt(this.thinkTimeInput.value);
-        const delay = speed * 10 + thinkTime;
+        const delay = 1000 / this.typingSpeed;
         
-        this.currentLine++;
-        this.timer = setTimeout(() => this.playNextLine(), delay);
-    }
-    
-    highlightLine(lineIndex) {
-        // 移除所有高亮
-        document.querySelectorAll('.code-line').forEach(el => {
-            el.classList.remove('active');
-            if (parseInt(el.dataset.line) < lineIndex) {
-                el.classList.add('completed');
-            }
-        });
-        
-        document.querySelectorAll('.line-numbers span').forEach(el => {
-            el.classList.remove('active');
-        });
-        
-        // 高亮当前行
-        const codeLine = document.querySelector(`.code-line[data-line="${lineIndex}"]`);
-        const numberLine = document.querySelector(`.line-numbers span[data-line="${lineIndex}"]`);
-        
-        if (codeLine) {
-            codeLine.classList.add('active');
-            codeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        
-        if (numberLine) {
-            numberLine.classList.add('active');
+        if (char === '\n' || this.currentIndex % 50 === 0) {
+            this.timer = setTimeout(() => this.typeNextChar(), delay + this.thinkTime);
+        } else {
+            this.timer = setTimeout(() => this.typeNextChar(), delay);
         }
     }
-    
+
+    updateDisplay() {
+        this.elements.codeContent.textContent = this.displayedCode;
+        
+        if (this.syntaxHighlight) {
+            this.elements.codeContent.innerHTML = this.highlightSyntax(this.displayedCode);
+        }
+        
+        this.updateLineNumbers();
+    }
+
+    updateLineNumbers() {
+        if (!this.showLineNumbers) return;
+        
+        const lines = this.displayedCode.split('\n');
+        const lineCount = lines.length;
+        
+        this.elements.lineNumbers.innerHTML = Array.from(
+            { length: lineCount },
+            (_, i) => `<div>${i + 1}</div>`
+        ).join('');
+    }
+
+    highlightSyntax(code) {
+        let highlighted = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        
+        const patterns = [
+            { regex: /\b(const|let|var|function|return|if|else|for|while|class|import|from|export|default|async|await|try|catch|throw|new|this|super|extends|static|public|private|protected|void|int|float|double|char|bool|string|true|false|null|undefined|None|def|print|import|as|with|lambda|yield|global|nonlocal|pass|break|continue|in|and|or|not|is|elif|else|except|finally|raise|assert|del|exec|eval|compile|__name__|__main__|self|cls)\b/g, class: 'syntax-keyword' },
+            { regex: /(["'`])(?:(?!\1)[^\\]|\\.)*?\1/g, class: 'syntax-string' },
+            { regex: /(\/\/.*$|\/\*[\s\S]*?\*\/|#.*$)/gm, class: 'syntax-comment' },
+            { regex: /\b(\d+\.?\d*)\b/g, class: 'syntax-number' },
+            { regex: /\b([a-zA-Z_]\w*)\s*(?=\()/g, class: 'syntax-function' },
+            { regex: /(\+|-|\*|\/|%|=|==|!=|<=|>=|<|>|&&|\|\||!|~|\^|&|\||<<|>>)/g, class: 'syntax-operator' }
+        ];
+        
+        const tokens = [];
+        let tokenIndex = 0;
+        
+        patterns.forEach(pattern => {
+            highlighted = highlighted.replace(pattern.regex, (match) => {
+                const token = `__TOKEN_${tokenIndex}__`;
+                tokens.push({ token, html: `<span class="${pattern.class}">${match}</span>` });
+                tokenIndex++;
+                return token;
+            });
+        });
+        
+        tokens.forEach(({ token, html }) => {
+            highlighted = highlighted.replace(token, html);
+        });
+        
+        return highlighted;
+    }
+
     triggerCameraShake() {
-        this.codeContainer.classList.add('shaking');
+        if (!this.cameraShake) return;
+        
+        if (Math.random() > 0.3) return;
+        
+        this.elements.editorContainer.classList.add('shaking');
+        
         setTimeout(() => {
-            this.codeContainer.classList.remove('shaking');
+            this.elements.editorContainer.classList.remove('shaking');
         }, 500);
     }
-    
-    updateProgress() {
-        const progress = (this.currentLine / this.lines.length) * 100;
-        this.progressBar.style.width = `${progress}%`;
-    }
-    
-    pause() {
-        this.isPaused = true;
-        this.setStatus('PAUSED');
-        this.status.classList.remove('playing');
-        clearTimeout(this.timer);
-    }
-    
-    reset() {
-        this.isPlaying = false;
-        this.isPaused = false;
-        this.currentLine = 0;
-        clearTimeout(this.timer);
-        
-        // 清除高亮
-        document.querySelectorAll('.code-line').forEach(el => {
-            el.classList.remove('active', 'completed');
-        });
-        
-        document.querySelectorAll('.line-numbers span').forEach(el => {
-            el.classList.remove('active');
-        });
-        
-        this.progressBar.style.width = '0%';
-        this.setStatus('READY');
-        this.status.classList.remove('playing');
-    }
-    
+
     complete() {
-        this.isPlaying = false;
-        this.setStatus('COMPLETED');
-        this.status.classList.remove('playing');
-        this.progressBar.style.width = '100%';
-    }
-    
-    setStatus(status) {
-        this.status.textContent = status;
-    }
-    
-    handleKeyboard(event) {
-        switch(event.code) {
-            case 'Space':
-                event.preventDefault();
-                if (this.isPlaying && !this.isPaused) {
-                    this.pause();
-                } else {
-                    this.play();
-                }
-                break;
-            case 'KeyR':
-                this.reset();
-                break;
-            case 'Escape':
-                this.pause();
-                break;
+        this.isRunning = false;
+        this.elements.startBtn.disabled = false;
+        this.elements.pauseBtn.disabled = true;
+        this.elements.pauseBtn.textContent = '⏸ 暂停';
+        this.elements.progressInfo.textContent = '✅ 完成';
+        
+        if (this.cameraShake) {
+            this.elements.editorContainer.classList.add('shaking');
+            setTimeout(() => {
+                this.elements.editorContainer.classList.remove('shaking');
+            }, 500);
         }
-    }
-    
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }
 
-// 初始化
 document.addEventListener('DOMContentLoaded', () => {
     window.visualizer = new CodeVisualizer();
 });

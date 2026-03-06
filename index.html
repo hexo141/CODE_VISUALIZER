@@ -4,94 +4,75 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Visualizer</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <!-- 头部 -->
-        <header class="header">
-            <h1 class="title">Code Visualizer</h1>
+        <header>
+            <h1>Code Visualizer</h1>
             <p class="subtitle">CODE_VISUALIZER</p>
         </header>
 
-        <!-- 文件选择区 -->
-        <div class="file-section">
-            <label class="file-label">
-                <input type="file" id="codeFile" accept=".py,.js,.cpp,.java,.txt" hidden>
-                <span class="file-btn">📁 选择代码文件</span>
-            </label>
-            <p class="file-hint">支持 Python, JS, C++, Java 等</p>
-        </div>
+        <div class="controls-panel">
+            <div class="control-group">
+                <label>📁 选择代码文件</label>
+                <input type="file" id="codeFile" accept=".py,.js,.cpp,.java,.txt" />
+            </div>
 
-        <!-- 设置面板 -->
-        <div class="settings-panel">
-            <h3 class="settings-title">⚙️ 自定义设置</h3>
-            
-            <div class="setting-group">
-                <label>
-                    <span>🚀 播放速度</span>
-                    <input type="range" id="speed" min="1" max="100" value="50">
-                    <span class="value-display" id="speedValue">50</span>
+            <div class="control-group">
+                <label>⚡ 打字速度 (字符/秒)</label>
+                <input type="range" id="typingSpeed" min="1" max="100" value="30" />
+                <span id="speedValue">30</span>
+            </div>
+
+            <div class="control-group">
+                <label>🤔 思考时间 (毫秒)</label>
+                <input type="range" id="thinkTime" min="0" max="2000" value="500" />
+                <span id="thinkValue">500</span>
+            </div>
+
+            <div class="control-group">
+                <label>📷 相机摇晃</label>
+                <label class="toggle">
+                    <input type="checkbox" id="cameraShake" />
+                    <span class="slider"></span>
                 </label>
             </div>
 
-            <div class="setting-group">
-                <label>
-                    <span>🤔 思考时间 (ms)</span>
-                    <input type="range" id="thinkTime" min="0" max="2000" value="500">
-                    <span class="value-display" id="thinkTimeValue">500</span>
+            <div class="control-group">
+                <label>📊 显示行数</label>
+                <label class="toggle">
+                    <input type="checkbox" id="showLineNumbers" checked />
+                    <span class="slider"></span>
                 </label>
             </div>
 
-            <div class="setting-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="showLineNumbers" checked>
-                    <span>📏 显示代码行数</span>
-                </label>
-            </div>
-
-            <div class="setting-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="cameraShake" checked>
-                    <span>📷 相机摇晃效果</span>
-                </label>
-            </div>
-
-            <div class="setting-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="autoPlay" checked>
-                    <span>▶️ 自动播放</span>
+            <div class="control-group">
+                <label>🎨 代码高亮</label>
+                <label class="toggle">
+                    <input type="checkbox" id="syntaxHighlight" checked />
+                    <span class="slider"></span>
                 </label>
             </div>
         </div>
 
-        <!-- 控制按钮 -->
-        <div class="controls">
-            <button id="playBtn" class="control-btn">▶️ 播放</button>
-            <button id="pauseBtn" class="control-btn">⏸️ 暂停</button>
-            <button id="resetBtn" class="control-btn">🔄 重置</button>
-        </div>
-
-        <!-- 状态显示 -->
         <div class="status-bar">
-            <span id="status">READY</span>
-            <span class="line-counter" id="lineCounter">0 行</span>
+            <span id="fileInfo">支持 Python, JS, C++, Java 等</span>
+            <span id="progressInfo">READY</span>
         </div>
 
-        <!-- 代码显示区 -->
-        <div class="code-container" id="codeContainer">
-            <div class="code-content" id="codeContent">
-                <pre><code id="codeDisplay">// 等待加载代码...</code></pre>
-            </div>
+        <div class="editor-container" id="editorContainer">
             <div class="line-numbers" id="lineNumbers"></div>
+            <pre class="code-display" id="codeDisplay"><code id="codeContent"></code></pre>
         </div>
 
-        <!-- 进度条 -->
-        <div class="progress-container">
-            <div class="progress-bar" id="progressBar"></div>
+        <div class="action-buttons">
+            <button id="startBtn" class="btn btn-primary">▶ 开始演示</button>
+            <button id="pauseBtn" class="btn btn-secondary">⏸ 暂停</button>
+            <button id="resetBtn" class="btn btn-danger">🔄 重置</button>
         </div>
     </div>
 
-    <script src="js/script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
