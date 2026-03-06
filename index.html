@@ -3,445 +3,428 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code Flow - Immersive Typing</title>
+    <title>Code Visualizer</title>
+    <!-- 引入 PrismJS 用于语法高亮 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-tsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
+    
+    <!-- 引入字体 -->
+    <link href="https://fontsource.ks3-cn-beijing.ksyun.com/jetbrains-mono/400.css" rel="stylesheet">
+    <link href="https://fontsource.ks3-cn-beijing.ksyun.com/jetbrains-mono/700.css" rel="stylesheet">
+
     <style>
         :root {
-            --bg-color: #0d0d0d;
-            --text-color: #e0e0e0;
-            --accent-color: #00ff9d; /* 荧光绿 */
-            --dim-color: #444;
-            --line-num-color: #333;
-            --font-main: 'Consolas', 'Monaco', 'Courier New', monospace;
-            --camera-lag: 0.08; /* 摄像机延迟系数，越小越慢 */
-            --shake-intensity: 2px; /* 基础晃动幅度 */
+            --bg-color: #0d0d12;
+            --text-color: #a9b7c6;
+            --accent-color: #61afef;
+            --cursor-color: #61afef;
+            --line-height: 1.6;
+            --font-size: 18px;
+            --camera-lag: 0.08;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: var(--font-main);
-            overflow: hidden; /* 禁止原生滚动，由 JS 控制摄像机 */
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
             height: 100vh;
             width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             user-select: none;
         }
 
-        /* 顶部标题栏 */
-        header {
-            position: fixed;
+        /* 背景网格线效果 */
+        .grid-bg {
+            position: absolute;
             top: 0;
             left: 0;
-            padding: 20px;
-            z-index: 100;
-            pointer-events: none;
-            mix-blend-mode: difference;
-        }
-
-        h1 {
-            font-size: 14px;
-            font-weight: normal;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            opacity: 0.8;
-        }
-
-        .author {
-            font-size: 12px;
-            color: var(--accent-color);
-            margin-top: 5px;
-            opacity: 0.7;
-        }
-
-        /* 主容器 - 摄像机视口 */
-        #viewport {
-            position: relative;
             width: 100%;
             height: 100%;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+            pointer-events: none;
         }
 
-        /* 代码世界 - 被摄像机观察的对象 */
-        #world {
+        /* 初始上传界面 */
+        #upload-screen {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%); /* 初始居中 */
-            will-change: transform;
-            display: flex;
-            flex-direction: row;
-            min-width: 800px; /* 保证代码不挤 */
-        }
-
-        /* 行号栏 */
-        #line-numbers {
-            padding: 20px 10px;
-            text-align: right;
-            color: var(--line-num-color);
-            font-size: 16px;
-            line-height: 1.6;
-            border-right: 1px solid var(--dim-color);
-            margin-right: 20px;
-            user-select: none;
-            min-width: 60px;
-        }
-
-        /* 代码显示区 */
-        #code-display {
-            font-size: 16px;
-            line-height: 1.6;
-            white-space: pre;
-            color: var(--text-color);
-            position: relative;
-        }
-
-        /* 光标 */
-        .cursor {
-            display: inline-block;
-            width: 8px;
-            height: 1.2em;
-            background-color: var(--accent-color);
-            vertical-align: text-bottom;
-            animation: blink 1s step-end infinite;
-            box-shadow: 0 0 10px var(--accent-color);
-        }
-
-        @keyframes blink { 50% { opacity: 0; } }
-
-        /* 语法高亮类 */
-        .kw { color: #ff79c6; } /* 关键字 */
-        .str { color: #f1fa8c; } /* 字符串 */
-        .com { color: #6272a4; font-style: italic; } /* 注释 */
-        .func { color: #8be9fd; } /* 函数 */
-        .num { color: #bd93f9; } /* 数字 */
-        .op { color: #ff79c6; } /* 操作符 */
-
-        /* 初始覆盖层 (文件选择) */
-        #overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(13, 13, 13, 0.95);
+            z-index: 100;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            z-index: 200;
-            transition: opacity 0.5s;
+            justify-content: center;
+            gap: 20px;
+            transition: opacity 0.5s ease;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
         }
 
-        #overlay.hidden { opacity: 0; pointer-events: none; }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
 
         .btn {
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
             background: transparent;
-            border: 1px solid var(--accent-color);
-            color: var(--accent-color);
-            padding: 15px 40px;
-            font-family: var(--font-main);
+            padding: 12px 30px;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 16px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 2px;
         }
 
         .btn:hover {
-            background: var(--accent-color);
+            background: var(--text-color);
             color: var(--bg-color);
-            box-shadow: 0 0 20px var(--accent-color);
+            box-shadow: 0 0 15px rgba(169, 183, 198, 0.4);
         }
 
-        input[type="file"] { display: none; }
+        input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
 
-        .settings {
-            margin-top: 30px;
-            display: flex;
-            gap: 20px;
+        /* 代码显示区域容器 (Camera Viewport) */
+        #viewport {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden; /* 关键：隐藏超出部分，模拟相机视野 */
+            z-index: 10;
+        }
+
+        /* 实际移动的代码层 */
+        #code-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform;
+            /* 初始位置由 JS 控制 */
+            transform: translate(0, 0); 
+            padding: 50vh 50vw; /* 增加内边距，防止代码贴边 */
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        pre {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            font-size: var(--font-size);
+            line-height: var(--line-height);
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
+            display: inline-block; /* 让 pre 宽度适应内容 */
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace !important;
+            white-space: pre;
+            display: block;
+        }
+
+        /* 光标样式 */
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 1.2em;
+            background-color: var(--cursor-color);
+            vertical-align: text-bottom;
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+            box-shadow: 0 0 10px var(--cursor-color);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 语法高亮微调 (覆盖 Prism 默认) */
+        .token.comment, .token.prolog, .token.doctype, .token.cdata {
+            color: #5c6370;
+            font-style: italic;
+        }
+        .token.punctuation {
+            color: #abb2bf;
+        }
+        .token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted {
+            color: #d19a66;
+        }
+        .token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted {
+            color: #98c379;
+        }
+        .token.operator, .token.entity, .token.url, .language-css .token.string, .style .token.string {
+            color: #56b6c2;
+        }
+        .token.atrule, .token.attr-value, .token.keyword {
+            color: #c678dd;
+        }
+        .token.function, .token.class-name {
+            color: #61afef;
+        }
+        .token.regex, .token.important, .token.variable {
+            color: #e06c75;
+        }
+
+        /* 晕影效果 */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 0 150px rgba(0,0,0,0.9) inset;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
             font-size: 12px;
-            color: #666;
-        }
-        
-        .setting-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        input[type="range"] {
-            accent-color: var(--accent-color);
+            opacity: 0.5;
+            font-family: 'JetBrains Mono', monospace;
+            z-index: 30;
+            pointer-events: none;
         }
 
-        /* 响应式调整 */
-        @media (max-width: 768px) {
-            #world { min-width: 95vw; }
-            #line-numbers { display: none; } /* 手机端隐藏行号以节省空间 */
-            #code-display { font-size: 14px; }
-        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Code Visualization</h1>
-        <div class="author">Github: hexo141 | Qwen</div>
-    </header>
+    <div class="grid-bg"></div>
+    <div class="vignette"></div>
 
+    <!-- 上传界面 -->
+    <div id="upload-screen">
+        <h2 style="font-weight: 400; letter-spacing: 4px; margin-bottom: 10px;">CODE_VISUALIZER</h2>
+        <div class="file-input-wrapper">
+            <button class="btn">选择代码文件</button>
+            <input type="file" id="file-input" accept=".py,.js,.ts,.jsx,.tsx,.css,.html,.java,.c,.cpp,.h,.json,.md,.txt">
+        </div>
+        <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">支持 Python, JS, C++, Java 等</p>
+    </div>
+
+    <!-- 代码视口 -->
     <div id="viewport">
-        <div id="world">
-            <div id="line-numbers"></div>
-            <div id="code-display"></div>
+        <div id="code-layer">
+            <pre><code id="code-content"></code></pre>
         </div>
     </div>
 
-    <div id="overlay">
-        <button class="btn" onclick="document.getElementById('fileInput').click()">选择代码文件</button>
-        <input type="file" id="fileInput" accept=".js,.py,.html,.css,.json,.txt,.md,.cpp,.java">
-        
-        <div class="settings">
-            <div class="setting-item">
-                <label>打字速度</label>
-                <input type="range" id="speedRange" min="10" max="200" value="60">
-            </div>
-            <div class="setting-item">
-                <label>思考停顿</label>
-                <input type="range" id="pauseRange" min="0" max="100" value="50">
-            </div>
-            <div class="setting-item">
-                <label>镜头晃动</label>
-                <input type="range" id="shakeRange" min="0" max="10" value="3">
-            </div>
-        </div>
-        <p style="margin-top:20px; color:#444; font-size:12px;">支持自动语法高亮 & 沉浸式镜头跟随</p>
-    </div>
+    <div class="status-bar" id="status-bar">READY</div>
 
     <script>
-        // 配置与状态
-        const config = {
-            baseSpeed: 60, // ms per char
-            pauseFactor: 0.5, // 停顿系数
-            shakeIntensity: 3 // 像素
-        };
+        const fileInput = document.getElementById('file-input');
+        const uploadScreen = document.getElementById('upload-screen');
+        const codeContent = document.getElementById('code-content');
+        const codeLayer = document.getElementById('code-layer');
+        const statusBar = document.getElementById('status-bar');
+        const viewport = document.getElementById('viewport');
 
-        const els = {
-            overlay: document.getElementById('overlay'),
-            fileInput: document.getElementById('fileInput'),
-            world: document.getElementById('world'),
-            codeDisplay: document.getElementById('code-display'),
-            lineNumbers: document.getElementById('line-numbers'),
-            speed: document.getElementById('speedRange'),
-            pause: document.getElementById('pauseRange'),
-            shake: document.getElementById('shakeRange')
-        };
-
-        let codeContent = "";
+        let fullCode = "";
+        let currentIndex = 0;
         let isTyping = false;
-        let cameraY = 0;
-        let targetY = 0;
-        let currentCharIndex = 0;
+        let currentLanguage = 'plaintext';
         
-        // 监听设置变化
-        els.speed.oninput = (e) => config.baseSpeed = 210 - e.target.value; 
-        els.pause.oninput = (e) => config.pauseFactor = e.target.value / 100;
-        els.shake.oninput = (e) => config.shakeIntensity = e.target.value;
+        // 相机状态
+        let camera = { x: 0, y: 0 };
+        let targetCamera = { x: 0, y: 0 };
+        
+        // 配置
+        const TYPING_SPEED_BASE = 25; // 基础打字速度 ms
+        const TYPING_SPEED_VAR = 40;  // 随机波动
+        const THINKING_CHANCE = 0.05; // 思考概率
+        const THINKING_DURATION = 400; // 思考时长 ms
+        const CAMERA_SENSITIVITY = 0.12; // 相机跟随灵敏度 (0-1) 降低一点让延迟感更明显
 
-        // 文件读取
-        els.fileInput.addEventListener('change', (e) => {
+        fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
+            currentLanguage = getLanguageFromExtension(file.name);
+
             const reader = new FileReader();
             reader.onload = (event) => {
-                codeContent = event.target.result;
-                initEditor(codeContent);
-                els.overlay.classList.add('hidden');
-                startTyping();
+                fullCode = event.target.result;
+                startVisualization();
             };
             reader.readAsText(file);
         });
 
-        // 初始化编辑器结构
-        function initEditor(code) {
-            els.codeDisplay.innerHTML = '';
-            els.lineNumbers.innerHTML = '';
-            
-            const lines = code.split('\n');
-            let lineHtml = '';
-            let numHtml = '';
-
-            lines.forEach((line, index) => {
-                // 生成行号
-                numHtml += `<div>${index + 1}</div>`;
-                // 生成代码行容器 (初始为空，稍后填充)
-                // 我们给每一行一个 ID 以便定位
-                lineHtml += `<div id="line-${index}" class="code-line"></div>`;
-            });
-
-            els.lineNumbers.innerHTML = numHtml;
-            els.codeDisplay.innerHTML = lineHtml;
+        function startVisualization() {
+            uploadScreen.style.opacity = '0';
+            setTimeout(() => {
+                uploadScreen.style.display = 'none';
+                statusBar.innerText = "CODING...";
+                
+                // 初始化：先渲染第一个字符，确保相机有目标
+                if (fullCode.length > 0) {
+                    const initialChar = fullCode.substring(0, 1);
+                    const highlightedCode = Prism.highlight(initialChar, Prism.languages[currentLanguage] || Prism.languages.plaintext, currentLanguage);
+                    codeContent.innerHTML = highlightedCode + '<span class="cursor"></span>';
+                    
+                    // 强制重绘以获取位置
+                    codeContent.getBoundingClientRect();
+                    
+                    updateCursorTarget();
+                    // 立即设置相机位置，避免初始闪烁
+                    camera.x = targetCamera.x;
+                    camera.y = targetCamera.y;
+                    codeLayer.style.transform = `translate(${camera.x}px, ${camera.y}px)`;
+                    
+                    currentIndex = 1;
+                    typeNextChar();
+                    requestAnimationFrame(updateCamera);
+                }
+            }, 500);
         }
 
-        // 轻量级语法高亮 (正则匹配)
-        function highlightLine(lineText) {
-            // 转义 HTML
-            let html = lineText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        async function typeNextChar() {
+            if (currentIndex >= fullCode.length) {
+                statusBar.innerText = "COMPLETED (Github: hexo141)";
+                isTyping = false;
+                return;
+            }
 
-            // 简单的正则规则 (可根据需要扩展)
-            // 1. 注释 (// 或 # 或 /* */)
-            html = html.replace(/(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/)/gm, '<span class="com">$1</span>');
-            
-            // 2. 字符串 ("..." or '...' or `...`) - 避免匹配到注释里的
-            html = html.replace(/(['"`])(?:(?=(\\?))\2.)*?\1/g, '<span class="str">$&</span>');
-
-            // 3. 关键字 (JS/Python 常见)
-            const keywords = /\b(const|let|var|function|return|if|else|for|while|class|import|from|def|print|async|await|try|catch|new|this|super)\b/g;
-            html = html.replace(keywords, '<span class="kw">$1</span>');
-
-            // 4. 函数调用
-            html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, '<span class="func">$1</span>');
-
-            // 5. 数字
-            html = html.replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
-
-            return html;
-        }
-
-        // 打字机逻辑
-        async function startTyping() {
             isTyping = true;
-            const lines = codeContent.split('\n');
-            const lineElements = document.querySelectorAll('.code-line');
             
-            // 创建光标
-            const cursor = document.createElement('span');
-            cursor.className = 'cursor';
-            
-            // 将光标放入第一行
-            if(lineElements[0]) lineElements[0].appendChild(cursor);
+            // 1. 获取下一个字符
+            const char = fullCode[currentIndex];
+            currentIndex++;
 
-            for (let i = 0; i < lines.length; i++) {
-                const lineText = lines[i];
-                const lineEl = lineElements[i];
-                
-                // 更新目标 Y 位置 (让当前行保持在视野中心偏上)
-                // 获取该行相对于 #world 的位置
-                // 注意：因为我们是动态添加内容，offsetTop 会变化
-                targetY = lineEl.offsetTop; 
+            // 2. 构建当前完整字符串
+            const currentText = fullCode.substring(0, currentIndex);
 
-                // 逐字打印当前行
-                // 为了高亮，我们不能直接 innerHTML += char，因为会破坏标签结构
-                // 策略：预先计算好高亮 HTML，然后逐个字符“揭示”或者简单地逐字插入文本节点
-                // 为了视觉效果最好，我们采用“逐字插入文本，最后替换为高亮 HTML"的策略会有闪烁。
-                // 更好的策略：逐字构建 HTML 字符串。
-                
-                let currentLineHtml = "";
-                
-                for (let j = 0; j < lineText.length; j++) {
-                    const char = lineText[j];
-                    
-                    // 移动光标到当前字符后
-                    // 由于我们是构建字符串，光标始终在最后
-                    // 我们只需要更新 DOM
-                    
-                    // 简单的打字效果：直接添加字符
-                    // 为了性能，每 5 个字符更新一次 DOM，或者每行更新一次？
-                    // 不，为了“打字机”感，必须逐个字符更新。
-                    
-                    // 优化：构建当前行的片段
-                    // 这里为了简单演示高亮，我们先打纯文本，打完一行后瞬间高亮？
-                    // 不，用户要求“编码过程上色”。
-                    // 实时高亮非常消耗性能。折中方案：
-                    // 1. 打字时是纯白色。
-                    // 2. 打完一个词或一行后上色。
-                    // 或者：打字时就是带颜色的（预计算）。
-                    
-                    // 采用预计算高亮方案：
-                    // 我们其实可以预先算出整行的高亮 HTML，然后每次只显示前 N 个字符的 HTML？
-                    // 这很难，因为标签是成对的。
-                    
-                    // **最终方案**：打字时显示纯文本（白色），当一行打完（或遇到特定符号）时，将该行替换为高亮版本。
-                    // 这样既保证了流畅度，又有上色效果。
-                    
-                    lineEl.textContent = lineText.substring(0, j + 1);
-                    lineEl.appendChild(cursor); // 保持光标在最后
+            // 3. 使用 Prism 高亮当前文本
+            const highlightedCode = Prism.highlight(currentText, Prism.languages[currentLanguage] || Prism.languages.plaintext, currentLanguage);
 
-                    // 随机停顿 (思考)
-                    let delay = config.baseSpeed;
-                    if (char === ';' || char === '}' || char === '{' || char === '\n') {
-                        delay += Math.random() * 300 * config.pauseFactor + 200;
-                    } else if (Math.random() > 0.9) {
-                        delay += Math.random() * 100; // 偶尔的卡顿
-                    }
+            // 4. 更新 DOM
+            codeContent.innerHTML = highlightedCode + '<span class="cursor"></span>';
 
-                    await sleep(delay);
-                }
+            // 5. 计算光标位置用于相机移动
+            updateCursorTarget();
 
-                // 行结束：应用高亮
-                lineEl.innerHTML = highlightLine(lineText);
-                lineEl.appendChild(cursor); // 把光标放回去
-                
-                // 换行逻辑：如果还有下一行，把光标移到下一行开头
-                if (i < lines.length - 1) {
-                    // 添加一个换行符视觉效果（其实 div 自带换行）
-                    // 移动光标 DOM 节点
-                    lineElements[i+1].appendChild(cursor);
-                    await sleep(100); // 换行小停顿
-                }
-            }
-            
-            // 结束
-            cursor.style.animation = 'none';
-            cursor.style.opacity = '1';
-            isTyping = false;
-        }
+            // 6. 决定下一次打字的时间 (模拟思考)
+            let delay = TYPING_SPEED_BASE + Math.random() * TYPING_SPEED_VAR;
 
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        // 摄像机循环 (Camera Loop)
-        function animateCamera() {
-            if (!isTyping && Math.abs(cameraY - targetY) < 1) {
-                // 如果没在打字且位置已对齐，减少计算
-                // 但为了保持微小的呼吸感/晃动，我们继续运行
+            // 遇到特定字符（如换行、分号、大括号）增加停顿概率
+            if (['\n', '{', '}', ';', ':'].includes(char)) {
+                if (Math.random() < 0.3) delay += 150;
             }
 
-            // 1. 线性插值 (Lerp) 实现延迟跟随
-            // cameraY 是当前摄像机 Y 偏移量
-            // targetY 是目标行相对于 #world 顶部的距离
-            // 我们希望 targetY 位于视口中心。
-            // 视口中心相对于 #world 是 0 (因为 #world 初始 translate(-50%, -50%))
-            // 所以我们需要移动 #world，使得 targetY 移动到 0 附近。
-            // 目标偏移量 = -targetY + (视口高度/2) - (行高/2)
-            
-            const viewportHeight = window.innerHeight;
-            const lineHeight = 25.6; // 16px * 1.6
-            
-            // 计算理想的 #world translateY 值
-            // 我们希望 lineEl 的 top 对齐到 视口中心偏上一点 (比如 40%)
-            const idealWorldY = -(targetY - (viewportHeight * 0.4));
+            // 随机深度思考
+            if (Math.random() < THINKING_CHANCE) {
+                delay += THINKING_DURATION;
+                statusBar.innerText = "THINKING...";
+            } else {
+                statusBar.innerText = "CODING...";
+            }
 
-            // 平滑过渡
-            cameraY += (idealWorldY - cameraY) * config.camera-lag;
+            setTimeout(typeNextChar, delay);
+        }
 
-            // 2. 添加晃动 (Shake)
-            // 基于时间的噪声
-            const time = Date.now() * 0.005;
-            const shakeX = (Math.sin(time) * Math.cos(time * 2.3) + Math.random() - 0.5) * config.shakeIntensity;
-            const shakeY = (Math.cos(time * 1.5) * Math.sin(time * 0.8) + Math.random() - 0.5) * config.shakeIntensity;
+        function getLanguageFromExtension(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const map = {
+                'py': 'python',
+                'js': 'javascript',
+                'ts': 'typescript',
+                'jsx': 'jsx',
+                'tsx': 'tsx',
+                'css': 'css',
+                'html': 'html',
+                'java': 'java',
+                'c': 'c',
+                'cpp': 'cpp',
+                'h': 'c',
+                'json': 'json',
+                'md': 'markdown'
+            };
+            return map[ext] || 'plaintext';
+        }
+
+        function updateCursorTarget() {
+            // 获取光标元素
+            const cursorEl = document.querySelector('.cursor');
+            if (!cursorEl) return;
+
+            // 获取视口尺寸
+            const viewportWidth = viewport.clientWidth;
+            const viewportHeight = viewport.clientHeight;
+
+            // 获取光标相对于 code-layer 的位置
+            // code-layer 是 absolute, top:0, left:0
+            // cursor 在 code-layer 内部
+            const cursorRect = cursorEl.getBoundingClientRect();
+            const layerRect = codeLayer.getBoundingClientRect();
+
+            // 光标在 code-layer 坐标系中的位置
+            const relativeX = cursorRect.left - layerRect.left;
+            const relativeY = cursorRect.top - layerRect.top;
+
+            // 目标：让光标保持在视口中心
+            // 相机位置 = 视口中心 - 光标相对位置
+            // 这样 transform(相机位置) + 光标相对位置 = 视口中心
+            targetCamera.x = (viewportWidth / 2) - relativeX;
+            targetCamera.y = (viewportHeight / 2) - relativeY;
+        }
+
+        function updateCamera() {
+            // 线性插值 (Lerp) 实现延迟跟随
+            camera.x += (targetCamera.x - camera.x) * CAMERA_SENSITIVITY;
+            camera.y += (targetCamera.y - camera.y) * CAMERA_SENSITIVITY;
 
             // 应用变换
-            // 保持 X 轴居中 (-50%)，Y 轴动态
-            els.world.style.transform = `translate(calc(-50% + ${shakeX}px), calc(-50% + ${cameraY + shakeY}px))`;
+            codeLayer.style.transform = `translate(${camera.x}px, ${camera.y}px)`;
 
-            requestAnimationFrame(animateCamera);
+            requestAnimationFrame(updateCamera);
         }
 
-        // 启动摄像机循环
-        animateCamera();
+        // 窗口大小改变时重新计算目标，确保代码不飞出视野
+        window.addEventListener('resize', () => {
+            if (currentIndex > 0 || fullCode.length === 0) {
+                updateCursorTarget();
+            }
+        });
 
     </script>
 </body>
 </html>
+
